@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D GTA Launcher  v1.0</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <hta:application 
+        id="oHTA" 
+        applicationname="3d-gta-launcher " 
+        border="dialog" 
+        caption="yes" 
+        maximizebutton="no"
+        minimizebutton="yes" 
+        sysmenu="yes" 
+        windowstate="normal"
+        icon="icons\gta.ico"
+    >
+    
+    <style>
+        body { background-color: #1e1e1e; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; overflow: hidden; }
+        .container { display: flex; flex-direction: column; height: 90vh; }
+        
+        .header-row { display: block; text-align: center; position: relative; margin-bottom: 15px; height: 40px; }
+        h1 { color: #00E676; margin: 0; font-size: 1.8em; text-shadow: 0 2px 4px rgba(0,0,0,0.5); display: inline-block;}
+        
+        .top-btn-group { position: absolute; right: 0; top: 5px; }
+        .btn-header { background: #333; color: #ccc; border: 1px solid #444; padding: 6px 15px; cursor: pointer; border-radius: 4px; font-size: 0.85em; margin-left: 5px; }
+        .btn-header:hover { background: #444; color: white; }
+        .btn-toggle-edit.active { background: #FFC107; color: #1e1e1e; border-color: #FFC107; font-weight: bold; }
+
+        .search-container { background: #2d2d2d; padding: 10px; border: 1px solid #333; border-radius: 8px; display: none; margin-bottom: 10px; border-left: 4px solid #FFC107; }
+        .help-text { font-size: 0.8em; color: #aaa; margin-top: 8px; padding-top: 8px; border-top: 1px solid #444; }
+        .highlight { color: #FFC107; font-weight: bold; }
+
+        .layout-table { width: 100%; border-collapse: collapse; }
+        .layout-td { vertical-align: middle; padding: 2px; }
+        .search-label { white-space: nowrap; font-weight: bold; color: #FFC107; margin-right: 10px; }
+        
+        input[type="text"] { width: 100%; padding: 8px; border: 1px solid #444; background: #1a1a1a; color: white; font-family: monospace; font-size: 1em; }
+        
+        button { cursor: pointer; border: none; font-weight: bold; padding: 8px 15px; font-size: 0.8rem; border-radius: 4px; }
+        .btn-scan { background-color: #2979FF; color: white; margin-left: 5px; }
+        .btn-stop { background-color: #d32f2f; color: white; display: none; margin-left: 5px; }
+        
+        .toolbar { margin-top: 5px; margin-bottom: 5px; height: 30px; position: relative;}
+        .options-area { position: absolute; left: 0; top: 5px; font-size: 0.8em; color: #aaa; }
+        .btn-clear { position: absolute; right: 0; top: 0; background: transparent; color: #ff5252; border: 1px solid #ff5252; padding: 5px 10px; font-size: 0.7em; display: none; }
+        .btn-clear:hover { background: #ff5252; color: white; }
+
+        .results-area { flex-grow: 1; overflow-y: auto; border: 1px solid #333; background: #121212; padding: 10px; border-radius: 4px; }
+        
+        .game-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; background: #252525; border-left: 4px solid #00E676; transition: background 0.2s; }
+        .game-table:hover { background-color: #2d2d2d; }
+        
+        .game-td-icon { width: 50px; padding: 10px; text-align: center; vertical-align: middle; }
+        .game-icon-img { width: 42px; height: 42px; object-fit: contain; border-radius: 4px; }
+        .game-td-info { padding: 10px 5px; text-align: left; vertical-align: middle; }
+        .game-td-actions { padding: 10px; text-align: right; width: 180px; white-space: nowrap; vertical-align: middle; }
+        
+        .game-title { font-size: 1.2em; font-weight: bold; color: #fff; display: block; margin-bottom: 4px; }
+        .game-path { font-size: 0.75em; color: #888; font-family: monospace; display: block; }
+        
+        .btn-play { background-color: #00C853; color: white; padding: 10px 25px; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-play:hover { background-color: #00E676; box-shadow: 0 0 10px rgba(0,230,118,0.4); }
+
+        .btn-icon { width: 30px; height: 30px; padding: 0; font-size: 14px; margin-left: 3px; }
+        .btn-edit { background: #FFC107; color: #000; }
+        .btn-edit:hover { background: #ffca28; }
+        .btn-remove { background: #444; color: #aaa; }
+        .btn-remove:hover { background: #f44336; color: white; }
+        
+        /* Botões de Ordenação */
+        .btn-move { background: #555; color: white; font-size: 12px; }
+        .btn-move:hover { background: #777; }
+
+        .status-bar { margin-top: 10px; font-size: 0.85em; color: #666; text-align: right; border-top: 1px solid #333; padding-top: 5px;}
+        
+        /* Modais */
+        .modal-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); z-index: 999; }
+        .modal-center-table { width: 100%; height: 100%; border-collapse: collapse; }
+        .modal-center-td { vertical-align: middle; text-align: center; }
+        .modal-box { background: #2d2d2d; border: 1px solid #555; padding: 25px; width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,1); border-radius: 8px; display: inline-block; text-align: left; }
+        .modal-header { font-size: 1.4em; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .modal-text { margin-bottom: 20px; color: #ccc; line-height: 1.5; }
+        .modal-input { width: 95%; padding: 10px; background: #1a1a1a; border: 1px solid #00E676; color: white; font-size: 1.1em; border-radius: 4px; margin-bottom: 20px; }
+        .modal-footer { text-align: right; }
+        .btn-modal { padding: 8px 20px; margin-left: 10px; }
+        .btn-cancel { background: #444; color: white; }
+        .btn-save { background: #00E676; color: white; }
+        .btn-danger { background: #ff5252; color: white; }
+        
+        .repo-link { color: #2979FF; text-decoration: underline; cursor: pointer; }
+        .border-edit { border-top: 4px solid #FFC107; }
+        .text-edit { color: #FFC107; }
+        .border-delete { border-top: 4px solid #ff5252; }
+        .text-delete { color: #ff5252; }
+        .border-info { border-top: 4px solid #2979FF; }
+        .text-info { color: #2979FF; }
+    </style>
+
+    <script language="VBScript">
+        Option Explicit
+        Dim fso, shell, gameDict, dataPath
+        Dim scanTimer, tempFile, doneFile, currentEditPath
+        Dim isEditMode
+        
+        ' NOVO: Array para guardar a ordem dos jogos
+        Dim gameOrderArray()
+        Dim gameOrderCount
+        
+        Set fso = CreateObject("Scripting.FileSystemObject")
+        Set shell = CreateObject("WScript.Shell")
+        Set gameDict = CreateObject("Scripting.Dictionary")
+
+        Sub Window_OnLoad
+            ' --- LÓGICA DE CENTRALIZAÇÃO E TAMANHO FIXO ---
+            Dim width, height
+            width = 850
+            height = 700
+            window.resizeTo width, height
+            window.moveTo (screen.width - width) / 2, (screen.height - height) / 2
+            ' ---------------------------------------------
+            
+            dataPath = GetCurrentFolder() & "\launcher_data.json"
+            Dim tempFolder : tempFolder = fso.GetSpecialFolder(2)
+            tempFile = tempFolder & "\launcher_scan_results.txt"
+            doneFile = tempFolder & "\launcher_scan_done.flag"
+            
+            Dim envProfile : envProfile = shell.ExpandEnvironmentStrings("%USERPROFILE%")
+            If envProfile <> "%USERPROFILE%" Then
+                document.getElementById("pathInput").value = envProfile
+            Else
+                document.getElementById("pathInput").value = "C:\"
+            End If
+
+            Call LoadData()
+            If gameDict.Count = 0 Then isEditMode = True
+            Call UpdateInterfaceState()
+        End Sub
+
+        Function GetCurrentFolder()
+            Dim path
+            path = document.location.pathname
+            If Left(path, 8) = "file:///" Then path = Mid(path, 9)
+            path = Replace(path, "/", "\")
+            path = Unescape(path)
+            GetCurrentFolder = fso.GetParentFolderName(path)
+        End Function
+
+        ' ==========================================
+        ' DADOS E LISTA ORDENADA
+        ' ==========================================
+        
+        ' Adiciona um caminho à lista ordenada (se não existir)
+        Sub AddToOrder(path)
+            Dim i
+            For i = 0 To gameOrderCount - 1
+                If LCase(gameOrderArray(i)) = LCase(path) Then Exit Sub ' Já existe
+            Next
+            
+            ReDim Preserve gameOrderArray(gameOrderCount)
+            gameOrderArray(gameOrderCount) = path
+            gameOrderCount = gameOrderCount + 1
+        End Sub
+
+        ' Remove um caminho da lista ordenada
+        Sub RemoveFromOrder(path)
+            Dim i, j, newCount
+            newCount = 0
+            Dim tempArray()
+            
+            For i = 0 To gameOrderCount - 1
+                If LCase(gameOrderArray(i)) <> LCase(path) Then
+                    ReDim Preserve tempArray(newCount)
+                    tempArray(newCount) = gameOrderArray(i)
+                    newCount = newCount + 1
+                End If
+            Next
+            
+            gameOrderCount = newCount
+            If newCount > 0 Then
+                ' Copia de volta
+                ReDim gameOrderArray(newCount - 1)
+                For i = 0 To newCount - 1
+                    gameOrderArray(i) = tempArray(i)
+                Next
+            Else
+                Erase gameOrderArray
+            End If
+        End Sub
+
+        Sub LoadData()
+            gameDict.RemoveAll
+            gameOrderCount = 0
+            Erase gameOrderArray
+            
+            document.getElementById("chkAutoClose").checked = True
+            
+            If fso.FileExists(dataPath) Then
+                Dim file, content, lines, i, line, key, val, colonPos
+                Set file = fso.OpenTextFile(dataPath, 1)
+                If Not file.AtEndOfStream Then content = file.ReadAll
+                file.Close
+                
+                lines = Split(content, vbCrLf)
+                For i = 0 To UBound(lines)
+                    line = Trim(lines(i))
+                    If InStr(line, """autoClose""") > 0 Then
+                        If InStr(LCase(line), """false""") > 0 Then document.getElementById("chkAutoClose").checked = False
+                    End If
+                    colonPos = InStr(line, """: """)
+                    If colonPos > 0 And InStr(line, """autoClose""") = 0 Then
+                        key = Left(line, colonPos - 1)
+                        val = Mid(line, colonPos + 4)
+                        key = Mid(key, 2)
+                        val = Replace(val, """", "")
+                        If Right(val, 1) = "," Then val = Left(val, Len(val)-1)
+                        key = Replace(key, "\\", "\")
+                        
+                        If fso.FileExists(key) Then
+                            If Not gameDict.Exists(key) Then 
+                                gameDict.Add key, val
+                                ' Importante: Adiciona na ordem que leu do arquivo
+                                Call AddToOrder(key)
+                            End If
+                        End If
+                    End If
+                Next
+            End If
+            Call SaveData() 
+        End Sub
+
+        Sub SaveData()
+            Dim file, i, p, jsonStr, autoCloseVal
+            If document.getElementById("chkAutoClose").checked Then autoCloseVal = "true" Else autoCloseVal = "false"
+            Set file = fso.CreateTextFile(dataPath, True)
+            file.WriteLine "{"
+            file.WriteLine "  ""settings"": { ""autoClose"": """ & autoCloseVal & """ },"
+            file.WriteLine "  ""games"": {"
+            
+            ' Salva seguindo a ordem do ARRAY, não do Dicionário
+            For i = 0 To gameOrderCount - 1
+                p = gameOrderArray(i)
+                If gameDict.Exists(p) Then
+                    Dim escPath : escPath = Replace(p, "\", "\\")
+                    jsonStr = "    """ & escPath & """: """ & gameDict.Item(p) & """"
+                    If i < gameOrderCount - 1 Then jsonStr = jsonStr & ","
+                    file.WriteLine jsonStr
+                End If
+            Next
+            
+            file.WriteLine "  }"
+            file.WriteLine "}"
+            file.Close
+        End Sub
+
+        ' ==========================================
+        ' ORDENAÇÃO MANUAL
+        ' ==========================================
+        Sub MoveGame(pathHTML, direction)
+            Dim path, i, temp
+            path = CleanPath(pathHTML)
+            
+            ' Encontrar índice
+            Dim idx
+            idx = -1
+            For i = 0 To gameOrderCount - 1
+                If LCase(gameOrderArray(i)) = LCase(path) Then
+                    idx = i
+                    Exit For
+                End If
+            Next
+            
+            If idx = -1 Then Exit Sub
+            
+            ' Mover para Cima (-1)
+            If direction = -1 And idx > 0 Then
+                temp = gameOrderArray(idx)
+                gameOrderArray(idx) = gameOrderArray(idx - 1)
+                gameOrderArray(idx - 1) = temp
+                Call SaveData()
+                Call RenderList()
+            ' Mover para Baixo (1)
+            ElseIf direction = 1 And idx < gameOrderCount - 1 Then
+                temp = gameOrderArray(idx)
+                gameOrderArray(idx) = gameOrderArray(idx + 1)
+                gameOrderArray(idx + 1) = temp
+                Call SaveData()
+                Call RenderList()
+            End If
+        End Sub
+
+        ' ==========================================
+        ' UI
+        ' ==========================================
+        Sub ToggleEditMode()
+            isEditMode = Not isEditMode
+            Call UpdateInterfaceState()
+        End Sub
+        
+        Sub UpdateInterfaceState()
+            Dim searchBox, btnToggle, btnClear, playOptions
+            Set searchBox = document.getElementById("searchBoxContainer")
+            Set btnToggle = document.getElementById("btnEditMode")
+            Set btnClear = document.getElementById("btnClear")
+            Set playOptions = document.getElementById("playToolbar")
+            
+            If isEditMode Then
+                searchBox.style.display = "block"
+                btnClear.style.display = "block"
+                playOptions.style.display = "none"
+                btnToggle.innerText = "✔ Concluir"
+                btnToggle.className = "btn-header btn-toggle-edit active"
+            Else
+                searchBox.style.display = "none"
+                btnClear.style.display = "none"
+                playOptions.style.display = "block"
+                btnToggle.innerText = "⚙ Editar"
+                btnToggle.className = "btn-header btn-toggle-edit"
+            End If
+            Call RenderList()
+        End Sub
+
+        Function GetGameIcon(exePath)
+            Dim folder, iconFile, fileName
+            folder = fso.GetParentFolderName(exePath)
+            fileName = LCase(fso.GetFileName(exePath))
+            If fso.FileExists(folder & "\icon.png") Then GetGameIcon = folder & "\icon.png" : Exit Function
+            If fso.FileExists(folder & "\icon.ico") Then GetGameIcon = folder & "\icon.ico" : Exit Function
+            Dim appDir, defaultIcon : appDir = GetCurrentFolder() & "\"
+            Select Case fileName
+                Case "gta3.exe"    defaultIcon = "icons\iii.ico"
+                Case "gta-vc.exe"  defaultIcon = "icons\vc.ico"
+                Case "gta_sa.exe"  defaultIcon = "icons\sa.ico"
+            End Select
+            If fso.FileExists(appDir & defaultIcon) Then GetGameIcon = appDir & defaultIcon Else GetGameIcon = "joy.cpl"
+        End Function
+
+        Sub RenderList()
+            Dim html, i, p, niceName, safePath, safeExe, parentFolder, safeFullPath, iconSrc
+            If gameDict.Count = 0 Then
+                document.getElementById("gameList").innerHTML = "<div style='text-align:center; padding:40px; color:#555;'>Nenhum jogo na biblioteca.</div>"
+                Exit Sub
+            End If
+            
+            html = ""
+            ' Agora renderizamos baseado na LISTA ORDENADA, não no dicionário
+            For i = 0 To gameOrderCount - 1
+                p = gameOrderArray(i)
+                
+                If gameDict.Exists(p) Then
+                    niceName = gameDict.Item(p)
+                    parentFolder = fso.GetParentFolderName(p)
+                    safePath = Replace(parentFolder, "\", "\\")
+                    safeExe = fso.GetFileName(p)
+                    safeFullPath = Replace(p, "\", "\\")
+                    iconSrc = GetGameIcon(p)
+                    
+                    html = html & "<table class='game-table'><tr>"
+                    
+                    ' Coluna Ícone
+                    html = html & "<td class='game-td-icon'>"
+                    If iconSrc <> "joy.cpl" Then
+                        html = html & "<img src='" & iconSrc & "' class='game-icon-img' onerror='this.style.display=""none""'>"
+                    Else
+                        html = html & "<span style='font-size:24px;'>🎮</span>"
+                    End If
+                    html = html & "</td>"
+                    
+                    ' Coluna Info
+                    html = html & "<td class='game-td-info'>"
+                    html = html & "  <span class='game-title'>" & niceName & "</span>"
+                    html = html & "  <span class='game-path' title='" & p & "'>" & p & "</span>"
+                    html = html & "</td>"
+                    
+                    ' Coluna Ações
+                    html = html & "<td class='game-td-actions'>"
+                    If isEditMode Then
+                        ' Botões de Ordenação e Edição
+                        html = html & "    <button class='btn-icon btn-move' title='Mover p/ Cima' onclick='MoveGame """ & safeFullPath & """, -1'>⬆</button>"
+                        html = html & "    <button class='btn-icon btn-move' title='Mover p/ Baixo' onclick='MoveGame """ & safeFullPath & """, 1'>⬇</button>"
+                        html = html & "    <button class='btn-icon btn-edit' title='Renomear' onclick='UI_OpenRename """ & safeFullPath & """'>🖊</button>"
+                        html = html & "    <button class='btn-icon btn-remove' title='Remover' onclick='RemoveGame """ & safeFullPath & """'>❌</button>"
+                    Else
+                        html = html & "    <button class='btn-play' onclick='LaunchGame """ & safePath & """, """ & safeExe & """'>JOGAR</button>"
+                    End If
+                    html = html & "</td>"
+                    html = html & "</tr></table>"
+                End If
+            Next
+            document.getElementById("gameList").innerHTML = html
+        End Sub
+
+        Sub StartScan()
+            Dim pathStr, cmd
+            pathStr = Trim(document.getElementById("pathInput").value)
+            If Right(pathStr, 1) = "\" Then pathStr = Left(pathStr, Len(pathStr) - 1)
+            If Not fso.FolderExists(pathStr) Then
+                MsgBox "Pasta nao encontrada!", 48, "Erro"
+                Exit Sub
+            End If
+            ToggleLoading(True)
+            document.getElementById("statusText").innerHTML = "ATUALIZANDO..."
+            On Error Resume Next
+            If fso.FileExists(tempFile) Then fso.DeleteFile tempFile
+            If fso.FileExists(doneFile) Then fso.DeleteFile doneFile
+            On Error Goto 0
+            cmd = "cmd /c ""dir /s /b /a:-d """ & pathStr & "\gta*.exe"" > """ & tempFile & """ & echo DONE > """ & doneFile & """"""
+            shell.Run cmd, 0, False
+            scanTimer = window.setInterval("CheckScanFile", 100)
+        End Sub
+
+        Sub CheckScanFile()
+            If fso.FileExists(doneFile) Then
+                window.clearInterval(scanTimer)
+                Call ProcessScanResults()
+            End If
+        End Sub
+
+        Sub StopScan()
+            window.clearInterval(scanTimer)
+            ToggleLoading(False)
+            document.getElementById("statusText").innerHTML = "Cancelado."
+        End Sub
+
+        Sub ProcessScanResults()
+            Dim file, content, lines, i, line, fileName, fullPath, addedCount, currentKeys, k
+            addedCount = 0
+            
+            If fso.FileExists(tempFile) Then
+                If fso.GetFile(tempFile).Size > 0 Then
+                    Set file = fso.OpenTextFile(tempFile, 1)
+                    content = file.ReadAll()
+                    file.Close
+                    lines = Split(content, vbCrLf)
+                    For i = 0 To UBound(lines)
+                        line = Trim(lines(i))
+                        If line <> "" Then
+                            fullPath = line
+                            fileName = LCase(fso.GetFileName(fullPath))
+                            If fileName = "gta3.exe" OR fileName = "gta-vc.exe" OR fileName = "gta_sa.exe" Then
+                                If Not gameDict.Exists(fullPath) Then
+                                    gameDict.Add fullPath, GetDefaultGameName(fullPath)
+                                    Call AddToOrder(fullPath) ' Adiciona na ordem
+                                    addedCount = addedCount + 1
+                                End If
+                            End If
+                        End If
+                    Next
+                End If
+                On Error Resume Next
+                fso.DeleteFile tempFile
+                fso.DeleteFile doneFile
+            End If
+
+            ' Limpeza: Cria um array novo apenas com itens válidos
+            Dim newOrder(), newCount
+            newCount = 0
+            For i = 0 To gameOrderCount - 1
+                If fso.FileExists(gameOrderArray(i)) Then
+                    ReDim Preserve newOrder(newCount)
+                    newOrder(newCount) = gameOrderArray(i)
+                    newCount = newCount + 1
+                Else
+                    If gameDict.Exists(gameOrderArray(i)) Then gameDict.Remove(gameOrderArray(i))
+                End If
+            Next
+            
+            ' Atualiza lista ordenada
+            gameOrderCount = newCount
+            If newCount > 0 Then
+                ReDim gameOrderArray(newCount - 1)
+                For i = 0 To newCount - 1
+                    gameOrderArray(i) = newOrder(i)
+                Next
+            Else
+                Erase gameOrderArray
+            End If
+
+            Call SaveData()
+            Call RenderList()
+            ToggleLoading(False)
+            
+            Dim msg : msg = "Pronto."
+            If addedCount > 0 Then msg = "+" & addedCount & " novos. "
+            document.getElementById("statusText").innerHTML = msg
+        End Sub
+
+        Sub ToggleLoading(isLoading)
+            Dim btnScan, btnStop
+            Set btnScan = document.getElementById("btnScan")
+            Set btnStop = document.getElementById("btnStop")
+            If isLoading Then
+                btnScan.style.display = "none" : btnStop.style.display = "inline" : document.body.style.cursor = "wait"
+            Else
+                btnScan.style.display = "inline" : btnStop.style.display = "none" : document.body.style.cursor = "default"
+            End If
+        End Sub
+
+        Function GetDefaultGameName(path)
+            Dim n : n = LCase(fso.GetFileName(path))
+            If n = "gta3.exe" Then GetDefaultGameName = "Grand Theft Auto III"
+            If n = "gta-vc.exe" Then GetDefaultGameName = "GTA: Vice City"
+            If n = "gta_sa.exe" Then GetDefaultGameName = "GTA: San Andreas"
+            If GetDefaultGameName = "" Then GetDefaultGameName = "GTA Desconhecido" 
+        End Function
+
+        Function CleanPath(p)
+            CleanPath = Replace(p, "\\", "\")
+        End Function
+
+        Sub LaunchGame(folder, exeName)
+            On Error Resume Next
+            Dim realFolder : realFolder = CleanPath(folder)
+            shell.CurrentDirectory = realFolder
+            If Err.Number <> 0 Then
+                MsgBox "Erro: Pasta nao encontrada.", 16, "Erro"
+                If MsgBox("Remover da lista?", 36, "Limpar") = 6 Then RemoveGame CleanPath(folder) & "\" & exeName
+                Exit Sub
+            End If
+            shell.Run Chr(34) & exeName & Chr(34), 1, False
+            If document.getElementById("chkAutoClose").checked Then window.close()
+        End Sub
+
+        Sub RemoveGame(pathHTML)
+            Dim realPath : realPath = CleanPath(pathHTML)
+            If gameDict.Exists(realPath) Then
+                gameDict.Remove(realPath)
+                Call RemoveFromOrder(realPath)
+                Call SaveData()
+                Call RenderList()
+            End If
+        End Sub
+        
+        Sub UI_OpenRename(pathHTML)
+            Dim realPath : realPath = CleanPath(pathHTML)
+            If gameDict.Exists(realPath) Then
+                currentEditPath = realPath
+                document.getElementById("inputRename").value = gameDict.Item(realPath)
+                document.getElementById("modalRename").style.display = "block"
+                document.getElementById("inputRename").focus()
+            End If
+        End Sub
+
+        Sub UI_SaveRename()
+            Dim newName : newName = document.getElementById("inputRename").value
+            newName = Replace(newName, """", "'") 
+            If newName <> "" And currentEditPath <> "" Then
+                If gameDict.Exists(currentEditPath) Then
+                    gameDict.Item(currentEditPath) = newName
+                    Call SaveData()
+                    Call RenderList()
+                End If
+                UI_CloseModals()
+            Else
+                MsgBox "O nome nao pode ficar vazio.", 48, "Aviso"
+            End If
+        End Sub
+
+        Sub UI_OpenClearConfirm()
+            document.getElementById("modalClear").style.display = "block"
+        End Sub
+        
+        Sub UI_OpenAbout()
+            document.getElementById("modalAbout").style.display = "block"
+        End Sub
+
+        Sub UI_ConfirmClear()
+            gameDict.RemoveAll
+            Erase gameOrderArray
+            gameOrderCount = 0
+            Call SaveData()
+            Call RenderList()
+            If Not isEditMode Then ToggleEditMode()
+            UI_CloseModals()
+            document.getElementById("statusText").innerHTML = "Biblioteca limpa."
+        End Sub
+
+        Sub UI_CloseModals()
+            document.getElementById("modalRename").style.display = "none"
+            document.getElementById("modalClear").style.display = "none"
+            document.getElementById("modalAbout").style.display = "none"
+            currentEditPath = ""
+        End Sub
+        
+        Sub OpenRepo()
+            shell.Run "https://github.com/KaioHSG/3d-gta-launcher ", 1, False
+        End Sub
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <h1>3D GTA Launcher  <small style="font-size:0.4em; color:#666;">v1.0</small></h1>
+            <div class="top-btn-group">
+                <button class="btn-header" onclick="UI_OpenAbout()" title="Sobre">❓</button>
+                <button id="btnEditMode" class="btn-header btn-toggle-edit" onclick="ToggleEditMode()">⚙ Editar</button>
+            </div>
+        </div>
+
+        <div id="searchBoxContainer" class="search-container">
+            <table class="layout-table"><tr>
+                <td class="layout-td" style="width:1%;">
+                    <label class="search-label">Escanear Pasta:</label>
+                </td>
+                <td class="layout-td">
+                    <input type="text" id="pathInput" title="Caminho para procurar jogos">
+                </td>
+                <td class="layout-td" style="width:1%; white-space:nowrap;">
+                    <button id="btnScan" class="btn-scan" onclick="StartScan()">Scan</button>
+                    <button id="btnStop" class="btn-stop" onclick="StopScan()">Stop</button>
+                </td>
+            </tr></table>
+            <div class="help-text">
+                Coloque <span class="highlight">icon.png</span> na pasta do jogo para personalizar.
+            </div>
+        </div>
+        
+        <div class="toolbar">
+            <div id="playToolbar" class="options-area">
+                <input type="checkbox" id="chkAutoClose" checked onclick="SaveData()"> 
+                <label for="chkAutoClose" style="cursor:pointer;">Fechar ao iniciar jogo</label>
+            </div>
+            <button id="btnClear" class="btn-clear" onclick="UI_OpenClearConfirm()">Limpar Tudo</button>
+        </div>
+
+        <div id="gameList" class="results-area"></div>
+
+        <div class="status-bar">
+            <span id="statusText">Pronto.</span>
+        </div>
+    </div>
+
+    <!-- Modais -->
+    <div id="modalRename" class="modal-overlay">
+        <table class="modal-center-table"><tr><td class="modal-center-td">
+            <div class="modal-box border-edit">
+                <div class="modal-header text-edit">Renomear Jogo</div>
+                <div class="modal-text">Novo nome:</div>
+                <input type="text" id="inputRename" class="modal-input" maxlength="50">
+                <div class="modal-footer">
+                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Cancelar</button>
+                    <button class="btn-modal btn-save" onclick="UI_SaveRename()">Salvar</button>
+                </div>
+            </div>
+        </td></tr></table>
+    </div>
+
+    <div id="modalClear" class="modal-overlay">
+        <table class="modal-center-table"><tr><td class="modal-center-td">
+            <div class="modal-box border-delete">
+                <div class="modal-header text-delete">Excluir Tudo?</div>
+                <div class="modal-text">Deseja apagar toda a biblioteca?</div>
+                <div class="modal-footer">
+                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Cancelar</button>
+                    <button class="btn-modal btn-danger" onclick="UI_ConfirmClear()">Limpar Tudo</button>
+                </div>
+            </div>
+        </td></tr></table>
+    </div>
+    
+    <div id="modalAbout" class="modal-overlay">
+        <table class="modal-center-table"><tr><td class="modal-center-td">
+            <div class="modal-box border-info">
+                <div class="modal-header text-info">Sobre</div>
+                <div class="modal-text" style="text-align:center;">
+                    <strong style="font-size:1.2em; color:white;">3D GTA Launcher </strong><br>
+                    <span style="color:#aaa;">Versão 1.0</span><br><br>
+                    Um launcher para organizar seus jogos clássicos.<br>
+                    <span class="repo-link" onclick="OpenRepo()">Visitar Repositório no GitHub</span>
+                </div>
+                <div class="modal-footer" style="text-align:center;">
+                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Fechar</button>
+                </div>
+            </div>
+        </td></tr></table>
+    </div>
+</body>
+</html>
