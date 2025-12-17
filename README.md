@@ -10,9 +10,10 @@
 
 1. Download the [**`3D-GTA-Launcher.zip`**](https://github.com/KaioHSG/3d-gta-launcher/releases/latest).
 2. Run **`3D GTA Launcher.hta`**.
-3. Change the `Scan Folder` directory to your desired location, and then click **`Done`**.
+3. Change the `Scan Folder` directory to your desired location, and then click **`Scan`**.
 
 <img width="49%" src="https://github.com/user-attachments/assets/d486c5a9-1ce8-46ce-bbe4-b0a949c544d9" />
 <img width="49%" src="https://github.com/user-attachments/assets/7769c74c-f535-48f7-b342-cf1dc0b0a5f0" />
 
 You can also customize certain items, such as the name, position, and icon.
+
