@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>3D GTA Launcher  v1.0</title>
+    <title>3D GTA Launcher v1.0</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     
     <hta:application 
-        id="oHTA" 
-        applicationname="3d-gta-launcher " 
+        id="3D-GTA-Launcher" 
+        applicationname="3D GTA Launcher" 
         border="dialog" 
         caption="yes" 
         maximizebutton="no"
@@ -100,33 +100,31 @@
 
     <script language="VBScript">
         Option Explicit
-        Dim fso, shell, gameDict, dataPath
+        Dim fso, shell, gameDict, iconDict, dataPath
         Dim scanTimer, tempFile, doneFile, currentEditPath
         Dim isEditMode
         
-        ' NOVO: Array para guardar a ordem dos jogos
+        ' Array para guardar a ordem dos jogos
         Dim gameOrderArray()
         Dim gameOrderCount
         
         Set fso = CreateObject("Scripting.FileSystemObject")
         Set shell = CreateObject("WScript.Shell")
         Set gameDict = CreateObject("Scripting.Dictionary")
+        Set iconDict = CreateObject("Scripting.Dictionary")
 
         Sub Window_OnLoad
-            ' --- LÓGICA DE CENTRALIZAÇÃO E TAMANHO FIXO ---
-            Dim width, height
-            width = 850
-            height = 700
+            Dim width, height, envProfile, tempFolder
+            width = 850 : height = 700
             window.resizeTo width, height
             window.moveTo (screen.width - width) / 2, (screen.height - height) / 2
-            ' ---------------------------------------------
             
             dataPath = GetCurrentFolder() & "\launcher_data.json"
-            Dim tempFolder : tempFolder = fso.GetSpecialFolder(2)
+            Set tempFolder = fso.GetSpecialFolder(2)
             tempFile = tempFolder & "\launcher_scan_results.txt"
             doneFile = tempFolder & "\launcher_scan_done.flag"
             
-            Dim envProfile : envProfile = shell.ExpandEnvironmentStrings("%USERPROFILE%")
+            envProfile = shell.ExpandEnvironmentStrings("%USERPROFILE%")
             If envProfile <> "%USERPROFILE%" Then
                 document.getElementById("pathInput").value = envProfile
             Else
@@ -147,28 +145,20 @@
             GetCurrentFolder = fso.GetParentFolderName(path)
         End Function
 
-        ' ==========================================
-        ' DADOS E LISTA ORDENADA
-        ' ==========================================
-        
-        ' Adiciona um caminho à lista ordenada (se não existir)
+        ' --- GERENCIAMENTO DE DADOS ---
         Sub AddToOrder(path)
             Dim i
             For i = 0 To gameOrderCount - 1
-                If LCase(gameOrderArray(i)) = LCase(path) Then Exit Sub ' Já existe
+                If LCase(gameOrderArray(i)) = LCase(path) Then Exit Sub
             Next
-            
             ReDim Preserve gameOrderArray(gameOrderCount)
             gameOrderArray(gameOrderCount) = path
             gameOrderCount = gameOrderCount + 1
         End Sub
 
-        ' Remove um caminho da lista ordenada
         Sub RemoveFromOrder(path)
-            Dim i, j, newCount
+            Dim i, newCount, tempArray()
             newCount = 0
-            Dim tempArray()
-            
             For i = 0 To gameOrderCount - 1
                 If LCase(gameOrderArray(i)) <> LCase(path) Then
                     ReDim Preserve tempArray(newCount)
@@ -176,10 +166,8 @@
                     newCount = newCount + 1
                 End If
             Next
-            
             gameOrderCount = newCount
             If newCount > 0 Then
-                ' Copia de volta
                 ReDim gameOrderArray(newCount - 1)
                 For i = 0 To newCount - 1
                     gameOrderArray(i) = tempArray(i)
@@ -191,6 +179,7 @@
 
         Sub LoadData()
             gameDict.RemoveAll
+            iconDict.RemoveAll
             gameOrderCount = 0
             Erase gameOrderArray
             
@@ -212,15 +201,14 @@
                     If colonPos > 0 And InStr(line, """autoClose""") = 0 Then
                         key = Left(line, colonPos - 1)
                         val = Mid(line, colonPos + 4)
-                        key = Mid(key, 2)
-                        val = Replace(val, """", "")
+                        key = Mid(key, 2) ' Remove aspas iniciais
+                        val = Replace(val, """", "") ' Remove aspas do valor
                         If Right(val, 1) = "," Then val = Left(val, Len(val)-1)
-                        key = Replace(key, "\\", "\")
+                        key = Replace(key, "\\", "\") ' Corrige escape do JSON
                         
                         If fso.FileExists(key) Then
                             If Not gameDict.Exists(key) Then 
                                 gameDict.Add key, val
-                                ' Importante: Adiciona na ordem que leu do arquivo
                                 Call AddToOrder(key)
                             End If
                         End If
@@ -231,18 +219,17 @@
         End Sub
 
         Sub SaveData()
-            Dim file, i, p, jsonStr, autoCloseVal
+            Dim file, i, p, jsonStr, autoCloseVal, escPath
             If document.getElementById("chkAutoClose").checked Then autoCloseVal = "true" Else autoCloseVal = "false"
             Set file = fso.CreateTextFile(dataPath, True)
             file.WriteLine "{"
             file.WriteLine "  ""settings"": { ""autoClose"": """ & autoCloseVal & """ },"
             file.WriteLine "  ""games"": {"
             
-            ' Salva seguindo a ordem do ARRAY, não do Dicionário
             For i = 0 To gameOrderCount - 1
                 p = gameOrderArray(i)
                 If gameDict.Exists(p) Then
-                    Dim escPath : escPath = Replace(p, "\", "\\")
+                    escPath = Replace(p, "\", "\\")
                     jsonStr = "    """ & escPath & """: """ & gameDict.Item(p) & """"
                     If i < gameOrderCount - 1 Then jsonStr = jsonStr & ","
                     file.WriteLine jsonStr
@@ -254,45 +241,26 @@
             file.Close
         End Sub
 
-        ' ==========================================
-        ' ORDENAÇÃO MANUAL
-        ' ==========================================
+        ' --- LÓGICA DE UI ---
         Sub MoveGame(pathHTML, direction)
-            Dim path, i, temp
+            Dim path, i, temp, idx
             path = CleanPath(pathHTML)
-            
-            ' Encontrar índice
-            Dim idx
             idx = -1
             For i = 0 To gameOrderCount - 1
-                If LCase(gameOrderArray(i)) = LCase(path) Then
-                    idx = i
-                    Exit For
-                End If
+                If LCase(gameOrderArray(i)) = LCase(path) Then idx = i : Exit For
             Next
             
             If idx = -1 Then Exit Sub
             
-            ' Mover para Cima (-1)
             If direction = -1 And idx > 0 Then
-                temp = gameOrderArray(idx)
-                gameOrderArray(idx) = gameOrderArray(idx - 1)
-                gameOrderArray(idx - 1) = temp
-                Call SaveData()
-                Call RenderList()
-            ' Mover para Baixo (1)
+                temp = gameOrderArray(idx) : gameOrderArray(idx) = gameOrderArray(idx - 1) : gameOrderArray(idx - 1) = temp
+                Call SaveData() : Call RenderList()
             ElseIf direction = 1 And idx < gameOrderCount - 1 Then
-                temp = gameOrderArray(idx)
-                gameOrderArray(idx) = gameOrderArray(idx + 1)
-                gameOrderArray(idx + 1) = temp
-                Call SaveData()
-                Call RenderList()
+                temp = gameOrderArray(idx) : gameOrderArray(idx) = gameOrderArray(idx + 1) : gameOrderArray(idx + 1) = temp
+                Call SaveData() : Call RenderList()
             End If
         End Sub
 
-        ' ==========================================
-        ' UI
-        ' ==========================================
         Sub ToggleEditMode()
             isEditMode = Not isEditMode
             Call UpdateInterfaceState()
@@ -309,45 +277,61 @@
                 searchBox.style.display = "block"
                 btnClear.style.display = "block"
                 playOptions.style.display = "none"
-                btnToggle.innerText = "✔ Concluir"
+                btnToggle.innerText = "✔ Done"
                 btnToggle.className = "btn-header btn-toggle-edit active"
             Else
                 searchBox.style.display = "none"
                 btnClear.style.display = "none"
                 playOptions.style.display = "block"
-                btnToggle.innerText = "⚙ Editar"
+                btnToggle.innerText = "⚙ Edit"
                 btnToggle.className = "btn-header btn-toggle-edit"
             End If
             Call RenderList()
         End Sub
 
+        ' Otimização: Cache de Ícones para evitar leitura de disco repetida
         Function GetGameIcon(exePath)
-            Dim folder, iconFile, fileName
+            If iconDict.Exists(exePath) Then
+                GetGameIcon = iconDict.Item(exePath)
+                Exit Function
+            End If
+
+            Dim folder, fileName, iconPath, appDir, defaultIcon
             folder = fso.GetParentFolderName(exePath)
             fileName = LCase(fso.GetFileName(exePath))
-            If fso.FileExists(folder & "\icon.png") Then GetGameIcon = folder & "\icon.png" : Exit Function
-            If fso.FileExists(folder & "\icon.ico") Then GetGameIcon = folder & "\icon.ico" : Exit Function
-            Dim appDir, defaultIcon : appDir = GetCurrentFolder() & "\"
-            Select Case fileName
-                Case "gta3.exe"    defaultIcon = "icons\iii.ico"
-                Case "gta-vc.exe"  defaultIcon = "icons\vc.ico"
-                Case "gta_sa.exe"  defaultIcon = "icons\sa.ico"
-            End Select
-            If fso.FileExists(appDir & defaultIcon) Then GetGameIcon = appDir & defaultIcon Else GetGameIcon = "joy.cpl"
+            appDir = GetCurrentFolder() & "\"
+            
+            If fso.FileExists(folder & "\icon.png") Then 
+                iconPath = folder & "\icon.png"
+            ElseIf fso.FileExists(folder & "\icon.ico") Then 
+                iconPath = folder & "\icon.ico"
+            Else
+                Select Case fileName
+                    Case "gta3.exe"    defaultIcon = "icons\iii.ico"
+                    Case "gta-vc.exe"  defaultIcon = "icons\vc.ico"
+                    Case "gta_sa.exe"  defaultIcon = "icons\sa.ico"
+                End Select
+                If fso.FileExists(appDir & defaultIcon) Then iconPath = appDir & defaultIcon Else iconPath = "joy.cpl"
+            End If
+            
+            iconDict.Add exePath, iconPath
+            GetGameIcon = iconPath
         End Function
 
+        ' Otimização: Uso de Array Join para renderizar HTML (muito mais rápido que concatenação de strings)
         Sub RenderList()
-            Dim html, i, p, niceName, safePath, safeExe, parentFolder, safeFullPath, iconSrc
+            Dim i, p, niceName, safePath, safeExe, parentFolder, safeFullPath, iconSrc, rowHtml
+            Dim htmlParts()
+            
             If gameDict.Count = 0 Then
-                document.getElementById("gameList").innerHTML = "<div style='text-align:center; padding:40px; color:#555;'>Nenhum jogo na biblioteca.</div>"
+                document.getElementById("gameList").innerHTML = "<div style='text-align:center; padding:40px; color:#555;'>No games found in library.</div>"
                 Exit Sub
             End If
             
-            html = ""
-            ' Agora renderizamos baseado na LISTA ORDENADA, não no dicionário
+            ReDim htmlParts(gameOrderCount - 1)
+            
             For i = 0 To gameOrderCount - 1
                 p = gameOrderArray(i)
-                
                 If gameDict.Exists(p) Then
                     niceName = gameDict.Item(p)
                     parentFolder = fso.GetParentFolderName(p)
@@ -356,54 +340,49 @@
                     safeFullPath = Replace(p, "\", "\\")
                     iconSrc = GetGameIcon(p)
                     
-                    html = html & "<table class='game-table'><tr>"
+                    rowHtml = "<table class='game-table'><tr>" & _
+                              "<td class='game-td-icon'>"
                     
-                    ' Coluna Ícone
-                    html = html & "<td class='game-td-icon'>"
                     If iconSrc <> "joy.cpl" Then
-                        html = html & "<img src='" & iconSrc & "' class='game-icon-img' onerror='this.style.display=""none""'>"
+                        rowHtml = rowHtml & "<img src='" & iconSrc & "' class='game-icon-img' onerror='this.style.display=""none""'>"
                     Else
-                        html = html & "<span style='font-size:24px;'>🎮</span>"
+                        rowHtml = rowHtml & "<span style='font-size:24px;'>🎮</span>"
                     End If
-                    html = html & "</td>"
                     
-                    ' Coluna Info
-                    html = html & "<td class='game-td-info'>"
-                    html = html & "  <span class='game-title'>" & niceName & "</span>"
-                    html = html & "  <span class='game-path' title='" & p & "'>" & p & "</span>"
-                    html = html & "</td>"
+                    rowHtml = rowHtml & "</td><td class='game-td-info'>" & _
+                              "<span class='game-title'>" & niceName & "</span>" & _
+                              "<span class='game-path' title='" & p & "'>" & p & "</span></td>" & _
+                              "<td class='game-td-actions'>"
                     
-                    ' Coluna Ações
-                    html = html & "<td class='game-td-actions'>"
                     If isEditMode Then
-                        ' Botões de Ordenação e Edição
-                        html = html & "    <button class='btn-icon btn-move' title='Mover p/ Cima' onclick='MoveGame """ & safeFullPath & """, -1'>⬆</button>"
-                        html = html & "    <button class='btn-icon btn-move' title='Mover p/ Baixo' onclick='MoveGame """ & safeFullPath & """, 1'>⬇</button>"
-                        html = html & "    <button class='btn-icon btn-edit' title='Renomear' onclick='UI_OpenRename """ & safeFullPath & """'>🖊</button>"
-                        html = html & "    <button class='btn-icon btn-remove' title='Remover' onclick='RemoveGame """ & safeFullPath & """'>❌</button>"
+                        rowHtml = rowHtml & "<button class='btn-icon btn-move' title='Move Up' onclick='MoveGame """ & safeFullPath & """, -1'>⬆</button>" & _
+                                            "<button class='btn-icon btn-move' title='Move Down' onclick='MoveGame """ & safeFullPath & """, 1'>⬇</button>" & _
+                                            "<button class='btn-icon btn-edit' title='Rename' onclick='UI_OpenRename """ & safeFullPath & """'>🖊️</button>" & _
+                                            "<button class='btn-icon btn-remove' title='Remove' onclick='RemoveGame """ & safeFullPath & """'>❌</button>"
                     Else
-                        html = html & "    <button class='btn-play' onclick='LaunchGame """ & safePath & """, """ & safeExe & """'>JOGAR</button>"
+                        rowHtml = rowHtml & "<button class='btn-play' onclick='LaunchGame """ & safePath & """, """ & safeExe & """'>PLAY</button>"
                     End If
-                    html = html & "</td>"
-                    html = html & "</tr></table>"
+                    
+                    rowHtml = rowHtml & "</td></tr></table>"
+                    htmlParts(i) = rowHtml
                 End If
             Next
-            document.getElementById("gameList").innerHTML = html
+            document.getElementById("gameList").innerHTML = Join(htmlParts, "")
         End Sub
 
+        ' --- SCANNING ---
         Sub StartScan()
             Dim pathStr, cmd
             pathStr = Trim(document.getElementById("pathInput").value)
             If Right(pathStr, 1) = "\" Then pathStr = Left(pathStr, Len(pathStr) - 1)
             If Not fso.FolderExists(pathStr) Then
-                MsgBox "Pasta nao encontrada!", 48, "Erro"
+                MsgBox "Folder not found!", 48, "Error"
                 Exit Sub
             End If
             ToggleLoading(True)
-            document.getElementById("statusText").innerHTML = "ATUALIZANDO..."
+            document.getElementById("statusText").innerHTML = "SCANNING..."
             On Error Resume Next
-            If fso.FileExists(tempFile) Then fso.DeleteFile tempFile
-            If fso.FileExists(doneFile) Then fso.DeleteFile doneFile
+            fso.DeleteFile tempFile : fso.DeleteFile doneFile
             On Error Goto 0
             cmd = "cmd /c ""dir /s /b /a:-d """ & pathStr & "\gta*.exe"" > """ & tempFile & """ & echo DONE > """ & doneFile & """"""
             shell.Run cmd, 0, False
@@ -420,12 +399,12 @@
         Sub StopScan()
             window.clearInterval(scanTimer)
             ToggleLoading(False)
-            document.getElementById("statusText").innerHTML = "Cancelado."
+            document.getElementById("statusText").innerHTML = "Cancelled."
         End Sub
 
         Sub ProcessScanResults()
-            Dim file, content, lines, i, line, fileName, fullPath, addedCount, currentKeys, k
-            addedCount = 0
+            Dim file, content, lines, i, line, fileName, fullPath, addedCount, newOrder(), newCount
+            addedCount = 0 : newCount = 0
             
             If fso.FileExists(tempFile) Then
                 If fso.GetFile(tempFile).Size > 0 Then
@@ -441,7 +420,7 @@
                             If fileName = "gta3.exe" OR fileName = "gta-vc.exe" OR fileName = "gta_sa.exe" Then
                                 If Not gameDict.Exists(fullPath) Then
                                     gameDict.Add fullPath, GetDefaultGameName(fullPath)
-                                    Call AddToOrder(fullPath) ' Adiciona na ordem
+                                    Call AddToOrder(fullPath)
                                     addedCount = addedCount + 1
                                 End If
                             End If
@@ -449,13 +428,10 @@
                     Next
                 End If
                 On Error Resume Next
-                fso.DeleteFile tempFile
-                fso.DeleteFile doneFile
+                fso.DeleteFile tempFile : fso.DeleteFile doneFile
             End If
 
-            ' Limpeza: Cria um array novo apenas com itens válidos
-            Dim newOrder(), newCount
-            newCount = 0
+            ' Limpeza de inválidos
             For i = 0 To gameOrderCount - 1
                 If fso.FileExists(gameOrderArray(i)) Then
                     ReDim Preserve newOrder(newCount)
@@ -466,7 +442,6 @@
                 End If
             Next
             
-            ' Atualiza lista ordenada
             gameOrderCount = newCount
             If newCount > 0 Then
                 ReDim gameOrderArray(newCount - 1)
@@ -477,12 +452,10 @@
                 Erase gameOrderArray
             End If
 
-            Call SaveData()
-            Call RenderList()
-            ToggleLoading(False)
+            Call SaveData() : Call RenderList() : ToggleLoading(False)
             
-            Dim msg : msg = "Pronto."
-            If addedCount > 0 Then msg = "+" & addedCount & " novos. "
+            Dim msg : msg = "Ready."
+            If addedCount > 0 Then msg = "+" & addedCount & " new. "
             document.getElementById("statusText").innerHTML = msg
         End Sub
 
@@ -502,7 +475,7 @@
             If n = "gta3.exe" Then GetDefaultGameName = "Grand Theft Auto III"
             If n = "gta-vc.exe" Then GetDefaultGameName = "GTA: Vice City"
             If n = "gta_sa.exe" Then GetDefaultGameName = "GTA: San Andreas"
-            If GetDefaultGameName = "" Then GetDefaultGameName = "GTA Desconhecido" 
+            If GetDefaultGameName = "" Then GetDefaultGameName = "Unknown GTA" 
         End Function
 
         Function CleanPath(p)
@@ -514,8 +487,8 @@
             Dim realFolder : realFolder = CleanPath(folder)
             shell.CurrentDirectory = realFolder
             If Err.Number <> 0 Then
-                MsgBox "Erro: Pasta nao encontrada.", 16, "Erro"
-                If MsgBox("Remover da lista?", 36, "Limpar") = 6 Then RemoveGame CleanPath(folder) & "\" & exeName
+                MsgBox "Error: Folder not found.", 16, "Error"
+                If MsgBox("Remove from list?", 36, "Clean") = 6 Then RemoveGame CleanPath(folder) & "\" & exeName
                 Exit Sub
             End If
             shell.Run Chr(34) & exeName & Chr(34), 1, False
@@ -526,6 +499,7 @@
             Dim realPath : realPath = CleanPath(pathHTML)
             If gameDict.Exists(realPath) Then
                 gameDict.Remove(realPath)
+                iconDict.Remove(realPath) ' Remove do cache também
                 Call RemoveFromOrder(realPath)
                 Call SaveData()
                 Call RenderList()
@@ -553,7 +527,7 @@
                 End If
                 UI_CloseModals()
             Else
-                MsgBox "O nome nao pode ficar vazio.", 48, "Aviso"
+                MsgBox "The name cannot be empty.", 48, "Warning"
             End If
         End Sub
 
@@ -567,13 +541,14 @@
 
         Sub UI_ConfirmClear()
             gameDict.RemoveAll
+            iconDict.RemoveAll
             Erase gameOrderArray
             gameOrderCount = 0
             Call SaveData()
             Call RenderList()
             If Not isEditMode Then ToggleEditMode()
             UI_CloseModals()
-            document.getElementById("statusText").innerHTML = "Biblioteca limpa."
+            document.getElementById("statusText").innerHTML = "Library cleared."
         End Sub
 
         Sub UI_CloseModals()
@@ -593,18 +568,18 @@
         <div class="header-row">
             <h1>3D GTA Launcher  <small style="font-size:0.4em; color:#666;">v1.0</small></h1>
             <div class="top-btn-group">
-                <button class="btn-header" onclick="UI_OpenAbout()" title="Sobre">❓</button>
-                <button id="btnEditMode" class="btn-header btn-toggle-edit" onclick="ToggleEditMode()">⚙ Editar</button>
+                <button class="btn-header" onclick="UI_OpenAbout()" title="About">❓</button>
+                <button id="btnEditMode" class="btn-header btn-toggle-edit" onclick="ToggleEditMode()">⚙ Edit</button>
             </div>
         </div>
 
         <div id="searchBoxContainer" class="search-container">
             <table class="layout-table"><tr>
                 <td class="layout-td" style="width:1%;">
-                    <label class="search-label">Escanear Pasta:</label>
+                    <label class="search-label">Scan Folder:</label>
                 </td>
                 <td class="layout-td">
-                    <input type="text" id="pathInput" title="Caminho para procurar jogos">
+                    <input type="text" id="pathInput" title="Path to search for games">
                 </td>
                 <td class="layout-td" style="width:1%; white-space:nowrap;">
                     <button id="btnScan" class="btn-scan" onclick="StartScan()">Scan</button>
@@ -612,22 +587,22 @@
                 </td>
             </tr></table>
             <div class="help-text">
-                Coloque <span class="highlight">icon.png</span> na pasta do jogo para personalizar.
+                Place <span class="highlight">icon.png</span> in the game folder to customize.
             </div>
         </div>
         
         <div class="toolbar">
             <div id="playToolbar" class="options-area">
                 <input type="checkbox" id="chkAutoClose" checked onclick="SaveData()"> 
-                <label for="chkAutoClose" style="cursor:pointer;">Fechar ao iniciar jogo</label>
+                <label for="chkAutoClose" style="cursor:pointer;">Close on game launch</label>
             </div>
-            <button id="btnClear" class="btn-clear" onclick="UI_OpenClearConfirm()">Limpar Tudo</button>
+            <button id="btnClear" class="btn-clear" onclick="UI_OpenClearConfirm()">Clear All</button>
         </div>
 
         <div id="gameList" class="results-area"></div>
 
         <div class="status-bar">
-            <span id="statusText">Pronto.</span>
+            <span id="statusText">Ready.</span>
         </div>
     </div>
 
@@ -635,12 +610,12 @@
     <div id="modalRename" class="modal-overlay">
         <table class="modal-center-table"><tr><td class="modal-center-td">
             <div class="modal-box border-edit">
-                <div class="modal-header text-edit">Renomear Jogo</div>
-                <div class="modal-text">Novo nome:</div>
+                <div class="modal-header text-edit">Rename Game</div>
+                <div class="modal-text">New name:</div>
                 <input type="text" id="inputRename" class="modal-input" maxlength="50">
                 <div class="modal-footer">
-                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Cancelar</button>
-                    <button class="btn-modal btn-save" onclick="UI_SaveRename()">Salvar</button>
+                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Cancel</button>
+                    <button class="btn-modal btn-save" onclick="UI_SaveRename()">Save</button>
                 </div>
             </div>
         </td></tr></table>
@@ -649,11 +624,11 @@
     <div id="modalClear" class="modal-overlay">
         <table class="modal-center-table"><tr><td class="modal-center-td">
             <div class="modal-box border-delete">
-                <div class="modal-header text-delete">Excluir Tudo?</div>
-                <div class="modal-text">Deseja apagar toda a biblioteca?</div>
+                <div class="modal-header text-delete">Delete All?</div>
+                <div class="modal-text">Do you want to delete the entire library?</div>
                 <div class="modal-footer">
-                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Cancelar</button>
-                    <button class="btn-modal btn-danger" onclick="UI_ConfirmClear()">Limpar Tudo</button>
+                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Cancel</button>
+                    <button class="btn-modal btn-danger" onclick="UI_ConfirmClear()">Clear All</button>
                 </div>
             </div>
         </td></tr></table>
@@ -662,15 +637,15 @@
     <div id="modalAbout" class="modal-overlay">
         <table class="modal-center-table"><tr><td class="modal-center-td">
             <div class="modal-box border-info">
-                <div class="modal-header text-info">Sobre</div>
+                <div class="modal-header text-info">About</div>
                 <div class="modal-text" style="text-align:center;">
                     <strong style="font-size:1.2em; color:white;">3D GTA Launcher </strong><br>
-                    <span style="color:#aaa;">Versão 1.0</span><br><br>
-                    Um launcher para organizar seus jogos clássicos.<br>
-                    <span class="repo-link" onclick="OpenRepo()">Visitar Repositório no GitHub</span>
+                    <span style="color:#aaa;">Version 1.0</span><br><br>
+                    A simple launcher to organize your classic games.<br>
+                    <span class="repo-link" onclick="OpenRepo()">Visit GitHub Repository</span>
                 </div>
                 <div class="modal-footer" style="text-align:center;">
-                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Fechar</button>
+                    <button class="btn-modal btn-cancel" onclick="UI_CloseModals()">Close</button>
                 </div>
             </div>
         </td></tr></table>
